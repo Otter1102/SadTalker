@@ -15,7 +15,7 @@ def kp2gaussian(kp, spatial_size, kp_variance):
     """
     mean = kp['value']
 
-    coordinate_grid = make_coordinate_grid(spatial_size, mean.type())
+    coordinate_grid = make_coordinate_grid(spatial_size, mean.device, mean.dtype)
     number_of_leading_dimensions = len(mean.shape) - 1
     shape = (1,) * number_of_leading_dimensions + coordinate_grid.shape
     coordinate_grid = coordinate_grid.view(*shape)
@@ -32,13 +32,15 @@ def kp2gaussian(kp, spatial_size, kp_variance):
 
     return out
 
-def make_coordinate_grid_2d(spatial_size, type):
+def make_coordinate_grid_2d(spatial_size, type=None, device=None, dtype=None):
     """
     Create a meshgrid [-1,1] x [-1,1] of given spatial_size.
     """
     h, w = spatial_size
-    x = torch.arange(w).type(type)
-    y = torch.arange(h).type(type)
+    if device is None and type is not None:
+        device, dtype = _parse_type_to_device_dtype(type)
+    x = torch.arange(w, device=device, dtype=dtype)
+    y = torch.arange(h, device=device, dtype=dtype)
 
     x = (2 * (x / (w - 1)) - 1)
     y = (2 * (y / (h - 1)) - 1)
@@ -51,11 +53,24 @@ def make_coordinate_grid_2d(spatial_size, type):
     return meshed
 
 
-def make_coordinate_grid(spatial_size, type):
+def _parse_type_to_device_dtype(type_str):
+    """Convert legacy tensor type string to (device, dtype) for MPS/CUDA/CPU compatibility."""
+    import torch as _torch
+    parts = type_str.lower().split('.')
+    if 'mps' in parts:
+        return 'mps', _torch.float32
+    elif 'cuda' in parts:
+        return 'cuda', _torch.float32
+    else:
+        return 'cpu', _torch.float32
+
+def make_coordinate_grid(spatial_size, device=None, dtype=None, type=None):
     d, h, w = spatial_size
-    x = torch.arange(w).type(type)
-    y = torch.arange(h).type(type)
-    z = torch.arange(d).type(type)
+    if device is None and type is not None:
+        device, dtype = _parse_type_to_device_dtype(type)
+    x = torch.arange(w, device=device, dtype=dtype)
+    y = torch.arange(h, device=device, dtype=dtype)
+    z = torch.arange(d, device=device, dtype=dtype)
 
     x = (2 * (x / (w - 1)) - 1)
     y = (2 * (y / (h - 1)) - 1)
